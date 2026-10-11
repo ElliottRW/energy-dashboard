@@ -1,0 +1,15 @@
+# Secrets – your Octopus API key and account number
+.env
+
+# Your data: readings, balance, transactions, postcode area (and the demo database)
+data/
+*.db
+
+# Local settings (contain paths on this Mac)
+.claude/
+
+# Python / OS clutter
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
