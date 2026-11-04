@@ -27,7 +27,7 @@ electric car), so you can look around first.
 
 1. Get your API key and account number: octopus.energy → **Account** → **Personal details** →
    **API access** (direct link: <https://octopus.energy/dashboard/new/accounts/personal-details/api-access>).
-   The account number looks like `A-1A2B3C4D`.
+   The account number looks like `A-XXXXXXXX`.
 2. Run `.venv/bin/python setup_keys.py` – it asks for both (the key is typed hidden), checks them
    with Octopus, shows the tariffs it found and saves them to `.env` (readable only by you, and in
    `.gitignore` so it's never uploaded).

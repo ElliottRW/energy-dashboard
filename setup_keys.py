@@ -20,7 +20,7 @@ ENV = os.path.join(HERE, ".env")
 
 def main():
     print("Find both at: octopus.energy → Account → Personal details → API access\n")
-    account = input("Account number (looks like A-1A2B3C4D): ").strip().upper()
+    account = input("Account number (looks like A-XXXXXXXX): ").strip().upper()
     if not re.fullmatch(r"A-[0-9A-F]{8}", account):
         print("That doesn't look like an Octopus account number (A- followed by 8 letters/digits).")
         sys.exit(1)
