@@ -38,6 +38,10 @@ electric car), so you can look around first.
 After that it syncs on start-up and every 6 hours while running, or press **Sync now**.
 Smart meter readings reach Octopus about a day late, so "today" is always a prediction.
 
+**No smart meter?** If Octopus has no half-hourly readings for your account, the app says so and
+shows your balance, bills, transactions, tariffs, Agile prices, weather and grid carbon. Predictions, usage
+patterns and anything else worked out from your usage appear by themselves once readings arrive.
+
 ---
 
 ## 2. What's on each tab

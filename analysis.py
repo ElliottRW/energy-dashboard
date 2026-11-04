@@ -362,11 +362,11 @@ def build(db, demo=False):
 
     # --- what you're paying now ---
     prices_now = {}
-    for fuel in fuels:
+    for fuel in fuels or FUELS:         # no readings at all: still show the tariffs on the account
         tariff = ct.tariff(fuel, now)
         if not tariff:
             continue
-        recent = [x for x in hh[fuel] if x[0] >= now - 30 * 86400]
+        recent = [x for x in hh.get(fuel, []) if x[0] >= now - 30 * 86400]
         weighted = None
         if recent:
             num = den = 0.0
@@ -379,7 +379,8 @@ def build(db, demo=False):
         unit_now = rb.unit(tariff, now, extend=True)
         prices_now[fuel] = {
             "tariff": tariff, "name": tariff_name(tariff),
-            "unit_now": r(unit_now), "unit_effective": r(weighted if weighted is not None else unit_now),
+            "unit_now": r(unit_now),
+            "unit_effective": r(weighted if weighted is not None else unit_now) if fuels else None,
             "standing": r(rb.standing(tariff, now, extend=True) or 0.0) if fuel != "export" else 0.0,
             "two_rate": is_two_rate(tariff),
             "fixed": "FIX" in product_code(tariff),
@@ -398,6 +399,7 @@ def build(db, demo=False):
 
     out = {
         "generated_at": now, "demo": demo, "today": today.isoformat(), "fuels": fuels,
+        "no_readings": not fuels,
         "account": _account_info(db, ct, fuels),
         "prices_now": prices_now,
         "models": {f: m.describe() for f, m in models.items()},
@@ -957,6 +959,12 @@ def _payment_plan(bal, monthly, fuels, today, daily=None, bills_check=None):
     if not bal:
         return None
     dd = bal.get("direct_debit") or {}
+    octopus = {"suggested_dd": bal.get("suggested_dd"), "minimum_dd": bal.get("minimum_dd"),
+               "projected_balance": bal.get("projected_balance"),
+               "should_review": bal.get("should_review_payments")}
+    if not fuels:                       # nothing to predict bills from, so no payment plan
+        return {"balance": bal["balance"], "overdue": bal.get("overdue", 0), "at": bal.get("at"),
+                "direct_debit": dd or None, "octopus": octopus}
     pay_day = dd.get("day") or 1
     start = date(today.year, today.month, 1)
     months = [m for m in monthly if m["month"] >= month_key(start)][:12]
@@ -1023,9 +1031,7 @@ def _payment_plan(bal, monthly, fuels, today, daily=None, bills_check=None):
         "total_12": round(sum(typical), 0),
         "unbilled": round(unbilled, 2) if unbilled is not None else None,
         "last_billed": max(last_billed.values()) if last_billed else None,
-        "octopus": {"suggested_dd": bal.get("suggested_dd"), "minimum_dd": bal.get("minimum_dd"),
-                    "projected_balance": bal.get("projected_balance"),
-                    "should_review": bal.get("should_review_payments")},
+        "octopus": octopus,
     }
     plan["path_min"] = path(typical, plan["min_typical"])
     plan["path_cautious"] = path(cautious, plan["min_cautious"])
@@ -1068,6 +1074,8 @@ def _renewal(db, rb, prices_now, models, climate, today, now):
         m = models.get(f)
         if m and f in prices_now:
             kwh[f] = sum((m.predict(d, climate.temp(d)[0] if climate.available else None) or 0) for d in days)
+    if not kwh:                         # no usage to price the options on
+        return None
 
     def price(code, f):
         if not code:
@@ -1368,7 +1376,7 @@ def _insights(out, daily, models, prices_now, today):
                              f"{ag['market_avg']:.1f}p if you'd used power evenly – "
                              + ("nice load-shifting." if diff > 0 else "try moving big loads to cheaper slots.")})
     pay = out.get("payments")
-    if pay and pay.get("direct_debit"):
+    if pay and pay.get("months") and pay.get("direct_debit"):
         dd = pay["direct_debit"]["amount"]
         if pay.get("current_goes_negative"):
             when = datetime.strptime(pay["current_goes_negative"], "%Y-%m").strftime("%B %Y")

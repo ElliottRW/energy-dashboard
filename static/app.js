@@ -212,17 +212,29 @@
           " in Terminal (it asks for your Octopus account number and API key), then restart the app.")));
     } else {
       st.textContent = `Updated ${ago(d.account.last_sync)}`;
-      $("#banner").replaceChildren();
+      $("#banner").replaceChildren(d.no_readings ? h("div", { class: "banner" }, icon("warn"),
+        h("div", {}, h("strong", {}, "No smart meter readings found. "),
+          "Octopus has no half-hourly readings for this account, which usually means there's no smart meter or it isn't sending readings yet. ",
+          "Your balance, bills and tariffs are below; predictions and usage patterns will appear by themselves once readings arrive."))
+        : "");
     }
+    document.querySelectorAll("#tabs button").forEach(b => {
+      b.style.display = d.no_readings && NEEDS_READINGS.includes(b.dataset.tab) ? "none" : "";
+    });
   }
 
   // ======================================================================
   // Tabs
   // ======================================================================
   const TABS = { overview, forecast, patterns, peaks, bills, prices, planet, about };
+  const NEEDS_READINGS = ["overview", "forecast", "patterns", "peaks"];
 
   function render() {
     if (!state.data) return;
+    if (state.data.no_readings && NEEDS_READINGS.includes(state.tab)) {
+      state.tab = "bills";
+      history.replaceState(null, "", "#bills");
+    }
     drawers = [];
     document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === state.tab)));
     const main = $("#main");
@@ -789,8 +801,8 @@
     if (p) {
       out.push(h("div", { class: "span-12 grid", style: { gap: "16px" } }, balanceTile(p),
         p.octopus && p.octopus.suggested_dd != null ? tile("Octopus suggests paying", `${money(p.octopus.suggested_dd)}/month`,
-          `minimum ${money(p.octopus.minimum_dd)} · our estimate ${money(p.min_typical, 0)}–${money(p.min_cautious, 0)}`, null, "span-6") : null));
-      out.push(paymentPlanner(p));
+          `minimum ${money(p.octopus.minimum_dd)}` + (p.months ? ` · our estimate ${money(p.min_typical, 0)}–${money(p.min_cautious, 0)}` : ""), null, "span-6") : null));
+      if (p.months) out.push(paymentPlanner(p));
     }
     const tx = d.transactions || [];
     if (tx.length) {
@@ -1000,7 +1012,7 @@
       const wxFuels = Object.keys(FUEL).filter(x => x in wx.fuels);
       const f = wxFuels.includes(state.wxFuel) ? state.wxFuel : wxFuels[0];
       const w = wx.fuels[f];
-      out.push(card("How the weather drives your use", "Each dot is a day from the last 12 months. The line is what we'd expect on a weekday.",
+      if (w) out.push(card("How the weather drives your use", "Each dot is a day from the last 12 months. The line is what we'd expect on a weekday.",
         h("div", {},
           chartBox(box => C.scatter(box, {
             points: w.points, color: color(f), line: w.line, height: 300, xLabel: "Average outdoor temperature (°C)", xFmt: v => `${v}°`, yFmt: v => nf0.format(v),
@@ -1022,13 +1034,13 @@
             { name: "Colder", color: C.css("--elec"), values: ms.map(m => m.normal_temp != null ? Math.min(0, +(m.temp - m.normal_temp).toFixed(1)) : 0) }],
           xTick: i => i % 3 ? null : monthLabel(ms[i].month) + ` ’${ms[i].month.slice(2, 4)}`,
           tooltip: i => ({ title: monthLabel(ms[i].month, true), rows: [{ color: C.css(ms[i].temp >= ms[i].normal_temp ? "--warm" : "--elec"), value: `${ms[i].temp}°C`, label: `normal ${ms[i].normal_temp}°C (${ms[i].temp >= ms[i].normal_temp ? "+" : ""}${(ms[i].temp - ms[i].normal_temp).toFixed(1)}°)` }] }),
-        })), { span: "span-5", right: legend([{ color: C.css("--warm"), label: "Warmer" }, { color: C.css("--elec"), label: "Colder" }]) }));
+        })), { span: w ? "span-5" : "span-12", right: legend([{ color: C.css("--warm"), label: "Warmer" }, { color: C.css("--elec"), label: "Colder" }]) }));
     }
 
     const cb = d.carbon;
     if (cb) {
       const totalKg = (cb.year_kg.elec || 0) + (cb.year_kg.gas || 0);
-      out.push(h("div", { class: "span-12 grid", style: { gap: "16px" } },
+      if (!d.no_readings) out.push(h("div", { class: "span-12 grid", style: { gap: "16px" } },
         tile("Carbon footprint · 12 months", `${(totalKg / 1000).toFixed(1)} t CO₂`,
           `${nf0.format(cb.year_kg.elec || 0)} kg from electricity · ${nf0.format(cb.year_kg.gas || 0)} kg from gas`, null, "span-4"),
         tile("Like driving", `${nf0.format(totalKg / 0.17)} km`, "in an average petrol car", null, "span-4"),
@@ -1093,7 +1105,8 @@
   function about(d) {
     const out = [];
     const q = d.quality;
-    out.push(card("Your data", null, tableView([
+    if (d.no_readings) out.push(card("Your data", null, h("div", { class: "empty" }, "No meter readings have been downloaded yet."), { span: "span-12" }));
+    else out.push(card("Your data", null, tableView([
       { label: "Fuel", get: r => h("span", {}, h("i", { class: "dot-key", vars: { "--k": color(r.f) } }), FUEL[r.f].name) },
       { label: "From", get: r => fmtDate(r.first) },
       { label: "To", get: r => fmtDate(r.last) },

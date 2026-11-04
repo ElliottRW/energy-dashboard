@@ -66,7 +66,9 @@ def static_files(name):
 
 @app.get("/api/dashboard")
 def api_dashboard():
-    if not DEMO and not db.fuels():
+    # Only "still downloading" until a sync has finished: after that, no readings means the
+    # meter isn't sending any, and the page shows what it can without them.
+    if not DEMO and not db.fuels() and not db.get("last_sync"):
         return jsonify({"empty": True, "sync": sync_manager.status})
     return jsonify(dashboard_data())
 
